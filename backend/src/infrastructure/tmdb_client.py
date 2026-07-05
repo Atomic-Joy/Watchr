@@ -11,23 +11,34 @@ class TMDBAPIError(Exception):
     """Exception raised for TMDB API errors."""
     pass
 
+class TMDBRetryableError(TMDBAPIError):
+    """Exception raised for TMDB API errors that should be retried (e.g. 429, 5xx)."""
+    pass
+
 class TMDBClient:
     def __init__(self):
         self.base_url = settings.TMDB_BASE_URL
         self.api_key = settings.TMDB_API_KEY
         self.headers = {
-            "accept": "application/json",
-            "Authorization": f"Bearer {self.api_key}" if self.api_key else ""
+            "accept": "application/json"
         }
+        # If it is a v4 Read Access Token (JWT/long string), send it in the Authorization header
+        if self.api_key and len(self.api_key) != 32:
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((httpx.RequestError, TMDBAPIError))
+        retry=retry_if_exception_type((httpx.RequestError, TMDBRetryableError))
     )
     async def _request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         url = f"{self.base_url}{endpoint}"
         query_params = params or {}
+        
+        # If it is a v3 API key (32 hex characters), pass it as a query parameter
+        if self.api_key and len(self.api_key) == 32:
+            query_params["api_key"] = self.api_key
+
         if not self.api_key:
             logger.warning("TMDB API Key is missing. The request may fail if authorization is required.")
 
@@ -36,7 +47,11 @@ class TMDBClient:
             
             if response.status_code == 429:
                 logger.warning("TMDB Rate limit hit. Retrying...")
-                raise TMDBAPIError("Rate limit exceeded")
+                raise TMDBRetryableError("Rate limit exceeded")
+                
+            if response.status_code >= 500:
+                logger.error(f"TMDB Server error: {response.status_code} - {response.text}")
+                raise TMDBRetryableError(f"HTTP {response.status_code}: {response.text}")
                 
             if response.status_code >= 400:
                 logger.error(f"TMDB API error: {response.status_code} - {response.text}")

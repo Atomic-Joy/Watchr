@@ -40,6 +40,7 @@ pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-jose==3.5.0
+python-multipart==0.0.18
 PyYAML==6.0.3
 redis==8.0.1
 rsa==4.9.1
