@@ -11,9 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+.eslintcache
+.vite
 
 # Editor directories and files
-.vscode/*
+.vscode/
 !.vscode/extensions.json
 .idea
 .DS_Store
@@ -25,16 +27,21 @@ dist-ssr
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+**/.pytest_cache/
 .coverage
 htmlcov/
+.ipynb_checkpoints
 
 # Virtual Environments
 venv/
 .venv/
 backend/venv/
+ENV/
+env/
 
 # Environments / Secrets
 .env
