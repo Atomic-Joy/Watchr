@@ -4,6 +4,7 @@ from src.infrastructure.config import settings
 from src.api.v1.endpoints import auth
 from src.api.v1.endpoints import search
 from src.api.v1.endpoints import users
+from src.api.v1.endpoints import sync
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -22,6 +23,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
+app.include_router(sync.router, prefix=f"{settings.API_V1_STR}/sync", tags=["sync"])
 app.include_router(search.router, prefix=f"{settings.API_V1_STR}/metadata", tags=["metadata"])
 
 @app.get("/health")

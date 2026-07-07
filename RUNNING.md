@@ -82,25 +82,193 @@ docker compose up -d
 
 ---
 
-## 🧪 Testing the API
+## 🧪 Running & Testing the API
 
-### Manual Testing
-You can manually query the running FastAPI instance:
-* **Search for movies/TV shows:**
-  ```bash
-  curl "http://localhost:8000/api/v1/metadata/search?query=Inception"
-  ```
-* **Get movie details:**
-  ```bash
-  curl "http://localhost:8000/api/v1/metadata/movies/272052"
-  ```
+### 1. Start Services
+Make sure your PostgreSQL database and Redis instances are running:
+```bash
+docker compose up -d
+```
 
-### Automated Testing
-You can create a `tests` suite using `pytest` (pre-installed in the virtual environment):
-1. Create a `tests/` directory under `backend/`.
-2. Create test files matching the prefix `test_*.py`.
-3. Run the test suite:
-   ```bash
-   cd backend
-   pytest
-   ```
+### 2. Run Database Migrations
+Apply the database schemas (including user preferences, watch history, sync logs, and metadata tables):
+```bash
+cd backend
+source venv/bin/activate
+alembic upgrade head
+```
+
+### 3. Start the FastAPI Dev Server
+```bash
+uvicorn src.main:app --reload
+```
+The server will start at [http://localhost:8000](http://localhost:8000) and the interactive docs will be at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### 4. Start the Celery Worker (In a separate terminal)
+To handle background metadata synchronization:
+```bash
+cd backend
+source venv/bin/activate
+celery -A src.workers.celery_app worker --loglevel=info
+```
+
+---
+
+## 🛰️ API Testing Guide
+
+### A. Authentication & Users
+All commands can be run from the root of the workspace.
+
+#### 1. Register a new user:
+```bash
+curl -X POST "http://localhost:8000/api/v1/users/" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "test@example.com", "password": "securepassword123"}'
+```
+
+#### 2. Log in and get an Access Token:
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login/access-token" \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "username=test@example.com&password=securepassword123"
+```
+*Note: Access tokens are valid for 30 minutes. Export the token value as an environment variable to use in the subsequent steps:*
+```bash
+export TOKEN="<your_copied_access_token_here>"
+```
+
+#### 3. View user profile:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/me" \
+     -H "Authorization: Bearer $TOKEN"
+```
+
+#### 4. View and update preferences:
+```bash
+# Get preferences
+curl -X GET "http://localhost:8000/api/v1/users/me/preferences" \
+     -H "Authorization: Bearer $TOKEN"
+
+# Update preferences
+curl -X PATCH "http://localhost:8000/api/v1/users/me/preferences" \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"timezone": "America/New_York", "language": "en"}'
+```
+
+---
+
+### B. Metadata & Search
+Test the local-first search system (which integrates Redis caching).
+
+#### 1. Trigger search (cache miss -> hits TMDB -> enqueues background TV show/movie sync):
+```bash
+curl -X GET "http://localhost:8000/api/v1/metadata/search?query=Inception"
+```
+**Expected Response:**
+```json
+{
+  "results": [ ... ],
+  "source": "tmdb"
+}
+```
+*(Check your Celery logs to see the worker syncing details for movies and show seasons on the fly!)*
+
+#### 2. Run the search again (cache hit -> returns directly from local database/Redis cache):
+```bash
+curl -X GET "http://localhost:8000/api/v1/metadata/search?query=Inception"
+```
+**Expected Response:**
+```json
+{
+  "results": [ ... ],
+  "source": "local"
+}
+```
+
+---
+
+### C. Conflict-Free Watch Progress Sync
+
+#### 1. Push watch logs:
+Pushes a batch of watch progress logs (simulating offline scrobble logs collected by a client):
+```bash
+curl -X POST "http://localhost:8000/api/v1/sync/push" \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '[
+       {
+         "device_id": "mobile_app_ios",
+         "action_type": "watch",
+         "media_type": "movie",
+         "tmdb_id": 27205,
+         "action_timestamp": "2026-07-06T10:00:00Z"
+       },
+       {
+         "device_id": "mobile_app_ios",
+         "action_type": "watch",
+         "media_type": "episode",
+         "tmdb_id": 1399,
+         "season_number": 1,
+         "episode_number": 1,
+         "action_timestamp": "2026-07-06T11:00:00Z"
+       }
+     ]'
+```
+**Expected Response:**
+```json
+{
+  "processed": 2,
+  "skipped": 0,
+  "status": "success"
+}
+```
+
+#### 2. Inspect watch history:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/me/history" \
+     -H "Authorization: Bearer $TOKEN"
+```
+**Expected Response:**
+```json
+[
+  {
+    "media_type": "episode",
+    "watched_at": "2026-07-06T11:00:00+00:00",
+    "title": "Game of Thrones - S01E01: Winter Is Coming",
+    "details": {
+      "show_title": "Game of Thrones",
+      "season_number": 1,
+      "episode_number": 1,
+      "episode_title": "Winter Is Coming"
+    }
+  },
+  {
+    "media_type": "movie",
+    "watched_at": "2026-07-06T10:00:00+00:00",
+    "title": "Inception",
+    "details": {
+      "tmdb_id": 27205,
+      "overview": "..."
+    }
+  }
+]
+```
+
+#### 3. Inspect TV Show progress:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/me/progress" \
+     -H "Authorization: Bearer $TOKEN"
+```
+**Expected Response:**
+```json
+[
+  {
+    "show_title": "Game of Thrones",
+    "progress_percent": 0.27,
+    "last_watched_at": "2026-07-06T11:00:00+00:00"
+  }
+]
+```
+
+
