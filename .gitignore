@@ -50,3 +50,8 @@ env/
 .env
 .env.*
 backend/.env
+
+# Celery Beat
+celerybeat-schedule*
+celerybeat.pid
+

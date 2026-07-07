@@ -5,6 +5,7 @@ from src.api.v1.endpoints import auth
 from src.api.v1.endpoints import search
 from src.api.v1.endpoints import users
 from src.api.v1.endpoints import sync
+from src.api.v1.endpoints import notification
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -25,6 +26,7 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["aut
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 app.include_router(sync.router, prefix=f"{settings.API_V1_STR}/sync", tags=["sync"])
 app.include_router(search.router, prefix=f"{settings.API_V1_STR}/metadata", tags=["metadata"])
+app.include_router(notification.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
 
 @app.get("/health")
 async def health_check():

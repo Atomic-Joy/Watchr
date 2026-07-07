@@ -45,3 +45,22 @@ def sync_metadata(self, media_type: str, tmdb_id: int):
     except Exception as exc:
         logger.error(f"Failed to sync {media_type} {tmdb_id}: {exc}")
         raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+
+async def _generate_release_notifications_async():
+    from src.infrastructure.database.session import AsyncSessionLocal
+    from src.application.services.notification_service import NotificationService
+    
+    async with AsyncSessionLocal() as session:
+        await NotificationService.generate_release_notifications(session)
+
+@celery_app.task(bind=True, max_retries=3)
+def sync_release_notifications(self):
+    """
+    Celery task to generate release notifications for tracked TV shows.
+    """
+    try:
+        asyncio.run(_generate_release_notifications_async())
+        return {"status": "success"}
+    except Exception as exc:
+        logger.error(f"Failed to generate release notifications: {exc}")
+        raise self.retry(exc=exc, countdown=2 ** self.request.retries)

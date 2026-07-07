@@ -5,6 +5,7 @@ from .user_preference import UserPreference
 from .history import WatchHistory, WatchProgress
 from .social import Rating, Review, List, ListItem
 from .sync_log import ClientSyncLog
+from .notification import ReleaseNotification, UserNotification
 
 __all__ = [
     "Base", 
@@ -12,5 +13,5 @@ __all__ = [
     "User", "UserPreference", 
     "WatchHistory", "WatchProgress", 
     "Rating", "Review", "List", "ListItem",
-    "ClientSyncLog"
+    "ClientSyncLog", "ReleaseNotification", "UserNotification"
 ]

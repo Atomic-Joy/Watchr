@@ -17,3 +17,12 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=3600,
 )
+
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    'generate-release-notifications-daily': {
+        'task': 'src.workers.tasks.sync_release_notifications',
+        'schedule': crontab(hour=0, minute=0), # Run daily at midnight UTC
+    },
+}

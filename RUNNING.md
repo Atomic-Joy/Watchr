@@ -52,12 +52,18 @@ docker compose up -d
    ```
    The API will be available at [http://localhost:8000](http://localhost:8000). You can access the interactive OpenAPI/Swagger documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-5. **Start the Celery Background Worker (Separate Terminal):**
+5. **Start the Celery Background Worker & Beat Scheduler (Separate Terminals):**
    In a new terminal window, activate the virtual environment and start the worker to handle background metadata sync tasks:
    ```bash
    cd backend
    source venv/bin/activate
    celery -A src.workers.celery_app worker --loglevel=info
+   ```
+   In another terminal, start the celery beat scheduler for running the daily release notification checks:
+   ```bash
+   cd backend
+   source venv/bin/activate
+   celery -A src.workers.celery_app beat --loglevel=info
    ```
 
 ---
@@ -104,12 +110,18 @@ uvicorn src.main:app --reload
 ```
 The server will start at [http://localhost:8000](http://localhost:8000) and the interactive docs will be at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-### 4. Start the Celery Worker (In a separate terminal)
+### 4. Start the Celery Worker & Beat (In separate terminals)
 To handle background metadata synchronization:
 ```bash
 cd backend
 source venv/bin/activate
 celery -A src.workers.celery_app worker --loglevel=info
+```
+To run scheduled notification checks:
+```bash
+cd backend
+source venv/bin/activate
+celery -A src.workers.celery_app beat --loglevel=info
 ```
 
 ---
@@ -271,4 +283,61 @@ curl -X GET "http://localhost:8000/api/v1/users/me/progress" \
 ]
 ```
 
+---
 
+### D. Pull-Based Release Notifications
+
+#### 1. Retrieve user notification feed:
+Fetches personalized release notifications for TV shows in the user's watch history:
+```bash
+curl -X GET "http://localhost:8000/api/v1/notifications/" \
+     -H "Authorization: Bearer $TOKEN"
+```
+
+#### 2. Mark a notification as read:
+```bash
+curl -X POST "http://localhost:8000/api/v1/notifications/<notification_id>/read" \
+     -H "Authorization: Bearer $TOKEN"
+```
+
+#### 3. Manually Trigger Notification Generation:
+To immediately trigger notification generation for tracked TV shows without waiting for the scheduled Celery Beat task, execute the following from the `backend/` directory:
+```bash
+cd backend
+venv/bin/python -c "
+import asyncio
+from src.infrastructure.database.session import AsyncSessionLocal
+from src.application.services.notification_service import NotificationService
+
+async def main():
+    async with AsyncSessionLocal() as session:
+        await NotificationService.generate_release_notifications(session)
+
+asyncio.run(main())
+"
+```
+
+---
+
+### E. Direct Database Access & Querying
+
+To view or manage the data stored in the local PostgreSQL database, use one of the options below:
+
+#### 1. Connect via CLI (`psql` in Docker / Podman)
+Run the following from the root directory containing your `docker-compose.yml` to start an interactive SQL shell:
+```bash
+docker compose exec db psql -U postgres -d trakt_clone
+```
+Useful commands once connected:
+* `\dt` - List all tables.
+* `SELECT * FROM watch_history;` - View logged user watch logs.
+* `SELECT title, first_air_date FROM tv_shows;` - View cached TV show metadata.
+* `\q` - Quit the terminal.
+
+#### 2. Connect via Database GUI Client (e.g., DBeaver, pgAdmin)
+Create a new **PostgreSQL** connection with the following settings:
+* **Host / Server:** `localhost` (or `127.0.0.1`)
+* **Port:** `5432`
+* **Database:** `trakt_clone` (Make sure to specify this instead of default `postgres`)
+* **Username:** `postgres`
+* **Password:** `postgres`

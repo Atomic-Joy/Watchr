@@ -21,3 +21,4 @@ class User(Base):
     reviews = relationship("Review", back_populates="user", cascade="all, delete-orphan")
     lists = relationship("List", back_populates="user", cascade="all, delete-orphan")
     sync_logs = relationship("ClientSyncLog", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("UserNotification", back_populates="user", cascade="all, delete-orphan")
