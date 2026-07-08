@@ -104,8 +104,11 @@ class WatchHistoryItem(BaseModel):
         from_attributes = True
 
 class WatchProgressItem(BaseModel):
+    tv_show_id: uuid.UUID
     show_title: str
     progress_percent: float
+    watched_episodes: int
+    total_episodes: int
     last_watched_at: str
 
     class Config:
@@ -179,10 +182,84 @@ async def get_my_watch_progress(
     progress_items = []
     for progress, tv_show in rows:
         progress_items.append(WatchProgressItem(
+            tv_show_id=tv_show.id,
             show_title=tv_show.title,
             progress_percent=float(progress.progress_percent),
+            watched_episodes=progress.watched_episodes or 0,
+            total_episodes=progress.total_episodes or 0,
             last_watched_at=progress.last_watched_at.isoformat()
         ))
         
     return progress_items
 
+@router.post("/me/progress/{tv_show_id}/watch-next")
+async def mark_next_episode_watched(
+    tv_show_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from src.domain.models.history import WatchProgress, WatchHistory
+    from src.domain.models.metadata import Episode, Season
+    from src.application.services.sync_service import SyncService
+    from sqlalchemy import and_, or_
+    import datetime
+    
+    # Get user's progress for this show
+    stmt = select(WatchProgress).where(
+        WatchProgress.user_id == current_user.id,
+        WatchProgress.tv_show_id == tv_show_id
+    )
+    res = await db.execute(stmt)
+    progress = res.scalars().first()
+    
+    if not progress:
+        raise HTTPException(status_code=404, detail="Watch progress not found for this show")
+
+    next_ep_stmt = select(Episode).join(Season).where(Season.tv_show_id == tv_show_id)
+    
+    if progress.last_watched_episode_id:
+        # Find last episode details
+        last_ep_res = await db.execute(
+            select(Episode, Season)
+            .join(Season, Episode.season_id == Season.id)
+            .where(Episode.id == progress.last_watched_episode_id)
+        )
+        last_row = last_ep_res.first()
+        if last_row:
+            last_ep, last_season = last_row
+            # Next chronological episode
+            next_ep_stmt = next_ep_stmt.where(
+                or_(
+                    and_(Season.season_number == last_season.season_number, Episode.episode_number == last_ep.episode_number + 1),
+                    and_(Season.season_number == last_season.season_number + 1, Episode.episode_number == 1)
+                )
+            )
+    else:
+        # First episode
+        next_ep_stmt = next_ep_stmt.where(Season.season_number == 1, Episode.episode_number == 1)
+
+    next_ep_stmt = next_ep_stmt.order_by(Season.season_number.asc(), Episode.episode_number.asc()).limit(1)
+    next_ep_res = await db.execute(next_ep_stmt)
+    next_episode = next_ep_res.scalars().first()
+
+    if not next_episode:
+        raise HTTPException(status_code=404, detail="No unwatched episode found for this show (metadata might be missing)")
+
+    # Record watch history
+    now = datetime.datetime.now(datetime.timezone.utc)
+    new_history = WatchHistory(
+        user_id=current_user.id,
+        media_type="episode",
+        media_id=next_episode.id,
+        watched_at=now,
+        device_info="web"
+    )
+    db.add(new_history)
+    await db.commit()
+
+    # Recalculate progress
+    sync_service = SyncService(db)
+    await sync_service._recalculate_tv_show_progress(current_user.id, tv_show_id, next_episode.id, now)
+    await db.commit()
+    
+    return {"message": "Next episode marked as watched", "episode_id": str(next_episode.id)}

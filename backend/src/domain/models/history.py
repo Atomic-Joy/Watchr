@@ -27,6 +27,8 @@ class WatchProgress(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     tv_show_id = Column(UUID(as_uuid=True), ForeignKey("tv_shows.id", ondelete="CASCADE"), primary_key=True)
     last_watched_episode_id = Column(UUID(as_uuid=True), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True)
+    watched_episodes = Column(Integer, default=0)
+    total_episodes = Column(Integer, default=0)
     progress_percent = Column(Numeric(5, 2), default=0.00)
     last_watched_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -55,3 +55,8 @@ backend/.env
 celerybeat-schedule*
 celerybeat.pid
 
+# Test / Temporary files
+test_*.py
+check_*.py
+fix_*.py
+*.txt

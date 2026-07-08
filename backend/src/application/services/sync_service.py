@@ -205,9 +205,10 @@ class SyncService:
         timestamp: datetime
     ) -> None:
         """Helper to calculate overall show watch percentage and update database."""
-        # Get total number of episodes in the show
+        # Get total number of episodes in the show (excluding Specials - Season 0)
         total_ep_stmt = select(func.count(Episode.id)).join(Season).where(
-            Season.tv_show_id == tv_show_uuid
+            Season.tv_show_id == tv_show_uuid,
+            Season.season_number > 0
         )
         total_ep_res = await self.session.execute(total_ep_stmt)
         total_episodes = total_ep_res.scalar() or 0
@@ -215,13 +216,14 @@ class SyncService:
         if total_episodes == 0:
             return
 
-        # Get total unique episodes watched by user for this show
+        # Get total unique episodes watched by user for this show (excluding Specials)
         watched_stmt = select(func.count(func.distinct(Episode.id))).join(
             WatchHistory, WatchHistory.media_id == Episode.id
         ).join(Season).where(
             WatchHistory.user_id == user_uuid,
             WatchHistory.media_type == "episode",
-            Season.tv_show_id == tv_show_uuid
+            Season.tv_show_id == tv_show_uuid,
+            Season.season_number > 0
         )
         watched_res = await self.session.execute(watched_stmt)
         watched_episodes = watched_res.scalar() or 0
@@ -238,6 +240,8 @@ class SyncService:
         
         if db_progress:
             db_progress.progress_percent = progress_percent
+            db_progress.watched_episodes = watched_episodes
+            db_progress.total_episodes = total_episodes
             db_progress.last_watched_at = timestamp
             if last_episode_uuid:
                 db_progress.last_watched_episode_id = last_episode_uuid
@@ -247,6 +251,8 @@ class SyncService:
                 tv_show_id=tv_show_uuid,
                 last_watched_episode_id=last_episode_uuid,
                 progress_percent=progress_percent,
+                watched_episodes=watched_episodes,
+                total_episodes=total_episodes,
                 last_watched_at=timestamp
             )
             self.session.add(new_progress)
