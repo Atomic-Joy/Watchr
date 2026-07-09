@@ -1,1 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  --color-brutal-black: #000000;
+  --color-brutal-white: #ffffff;
+  --color-brutal-off: #f0f0f0;
+  --color-brutal-gray: #888888;
+  --color-brutal-dark: #111111;
+  --color-brutal-mid: #1a1a1a;
+  --color-brutal-border: #333333;
+  --color-brutal-red: #ED1C24;
+  --color-brutal-green: #39FF14;
+  --color-brutal-yellow: #FFD600;
+  --color-brutal-blue: #0066FF;
+}
+
+/* ── Global Reset ── */
+* {
+  border-radius: 0 !important;
+}
+
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background-color: #000000;
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: #ED1C24;
+  color: #ffffff;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border: 1px solid #000000;
+}
+
+/* ── Brutalist Utilities ── */
+.brutal-card {
+  background: #111111;
+  border: 2px solid #333333;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.brutal-card:hover {
+  border-color: #ffffff;
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0px #ED1C24;
+}
+
+.brutal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 2px solid #ffffff;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.brutal-btn:hover {
+  background: #ffffff;
+  color: #000000;
+}
+.brutal-btn-primary {
+  background: #ED1C24;
+  border-color: #ED1C24;
+  color: #ffffff;
+}
+.brutal-btn-primary:hover {
+  background: #ffffff;
+  color: #ED1C24;
+  border-color: #ffffff;
+}
+
+.brutal-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: #000000;
+  border: 2px solid #333333;
+  color: #ffffff;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.brutal-input::placeholder {
+  color: #555555;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.875rem;
+}
+.brutal-input:focus {
+  border-color: #ED1C24;
+}
+
+.brutal-progress {
+  width: 100%;
+  height: 4px;
+  background: #333333;
+}
+.brutal-progress-fill {
+  height: 100%;
+  background: #ED1C24;
+  transition: width 0.3s ease;
+}
+
+/* ── Typography ── */
+.font-serif {
+  font-family: 'Instrument Serif', Georgia, serif;
+}
+
+/* ── Animations ── */
+@keyframes brutal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: brutal-slide-up 0.4s ease-out forwards;
+}
+
+@keyframes brutal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-brutal-pulse {
+  animation: brutal-pulse 1.5s ease-in-out infinite;
+}

@@ -114,6 +114,12 @@ class WatchProgressItem(BaseModel):
     class Config:
         from_attributes = True
 
+class UserStatisticsResponse(BaseModel):
+    total_hours: int
+    shows_completed: int
+    movies_watched: int
+    favorite_genre: str
+
 @router.get("/me/history", response_model=List[WatchHistoryItem])
 async def get_my_watch_history(
     current_user: User = Depends(get_current_user),
@@ -263,3 +269,61 @@ async def mark_next_episode_watched(
     await db.commit()
     
     return {"message": "Next episode marked as watched", "episode_id": str(next_episode.id)}
+
+@router.get("/me/stats", response_model=UserStatisticsResponse)
+async def get_my_watch_stats(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Calculate watch statistics (hours, shows completed, movies watched) for the current user."""
+    from src.domain.models.history import WatchHistory, WatchProgress
+    from src.domain.models.metadata import Episode, Movie
+    from sqlalchemy import func
+    
+    # Calculate total time spent watching in hours
+    # 1. Episodes
+    ep_sum_stmt = select(func.sum(func.coalesce(Episode.runtime, 0))).select_from(WatchHistory).join(
+        Episode, WatchHistory.media_id == Episode.id
+    ).where(
+        WatchHistory.user_id == current_user.id,
+        WatchHistory.media_type == "episode"
+    )
+    ep_res = await db.execute(ep_sum_stmt)
+    ep_minutes = ep_res.scalar() or 0
+
+    # 2. Movies
+    movie_sum_stmt = select(func.sum(func.coalesce(Movie.runtime, 0))).select_from(WatchHistory).join(
+        Movie, WatchHistory.media_id == Movie.id
+    ).where(
+        WatchHistory.user_id == current_user.id,
+        WatchHistory.media_type == "movie"
+    )
+    movie_res = await db.execute(movie_sum_stmt)
+    movie_minutes = movie_res.scalar() or 0
+
+    total_minutes = ep_minutes + movie_minutes
+    total_hours = round(total_minutes / 60)
+
+    # Calculate shows completed
+    shows_stmt = select(func.count(WatchProgress.tv_show_id)).where(
+        WatchProgress.user_id == current_user.id,
+        WatchProgress.total_episodes > 0,
+        WatchProgress.watched_episodes == WatchProgress.total_episodes
+    )
+    shows_res = await db.execute(shows_stmt)
+    shows_completed = shows_res.scalar() or 0
+
+    # Calculate movies watched
+    movies_stmt = select(func.count(func.distinct(WatchHistory.media_id))).where(
+        WatchHistory.user_id == current_user.id,
+        WatchHistory.media_type == "movie"
+    )
+    movies_res = await db.execute(movies_stmt)
+    movies_watched = movies_res.scalar() or 0
+
+    return UserStatisticsResponse(
+        total_hours=total_hours,
+        shows_completed=shows_completed,
+        movies_watched=movies_watched,
+        favorite_genre="N/A"
+    )
