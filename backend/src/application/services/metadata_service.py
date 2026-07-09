@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.dialects.postgresql import insert
 
 from src.domain.models.metadata import Movie, TVShow, Season, Episode
@@ -107,7 +108,11 @@ class MetadataService:
 
     async def get_tv_show(self, tv_id: int) -> Optional[TVShow]:
         """Get TV show from local database, or enqueue sync if missing."""
-        result = await self.session.execute(select(TVShow).where(TVShow.tmdb_id == tv_id))
+        result = await self.session.execute(
+            select(TVShow)
+            .options(selectinload(TVShow.seasons).selectinload(Season.episodes))
+            .where(TVShow.tmdb_id == tv_id)
+        )
         tv_show = result.scalars().first()
         
         if not tv_show:

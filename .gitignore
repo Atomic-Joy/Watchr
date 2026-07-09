@@ -60,3 +60,10 @@ test_*.py
 check_*.py
 fix_*.py
 *.txt
+
+# Local History & Coverage
+.history/
+coverage/
+.nyc_output/
+*.code-workspace
+

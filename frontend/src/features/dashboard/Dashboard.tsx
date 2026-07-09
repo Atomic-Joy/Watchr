@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { fetchWithAuth } from '../../lib/api';
 import { Bell, Play, Clock, CheckCircle2, Tv } from 'lucide-react';
 
@@ -12,6 +13,8 @@ export function Dashboard() {
     queryKey: ['progress'],
     queryFn: () => fetchWithAuth('/users/me/progress'),
   });
+
+  const activeProgress = progress?.filter((item: any) => item.progress_percent < 100) || [];
 
   const queryClient = useQueryClient();
 
@@ -57,7 +60,7 @@ export function Dashboard() {
             <h2 className="text-xs uppercase tracking-[0.3em] font-bold text-brutal-white">Up Next</h2>
             <div className="flex-1 h-px bg-brutal-border"></div>
             <span className="text-[10px] text-brutal-gray uppercase tracking-wider">
-              {progress?.length || 0} shows
+              {activeProgress.length} shows
             </span>
           </div>
 
@@ -67,54 +70,86 @@ export function Dashboard() {
                 <div key={i} className="h-24 bg-brutal-dark border-2 border-brutal-border animate-brutal-pulse"></div>
               ))}
             </div>
-          ) : progress && progress.length > 0 ? (
+          ) : activeProgress.length > 0 ? (
             <div className="space-y-3">
-              {progress.map((item: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="brutal-card flex items-center p-0 group"
-                >
-                  {/* Poster placeholder */}
-                  <div className="w-20 h-24 bg-brutal-mid border-r-2 border-brutal-border flex items-center justify-center flex-shrink-0">
-                    <Tv className="w-8 h-8 text-brutal-border" />
-                  </div>
+              {activeProgress.map((item: any, idx: number) => {
+                const episodesLeft = item.total_episodes - item.watched_episodes;
+                
+                return (
+                <div key={idx} className="flex gap-4 items-stretch group">
+                  {/* Poster */}
+                  <Link to={`/media/tv/${item.tmdb_id}`} className="block flex-shrink-0">
+                    <div className="w-[100px] h-[150px] bg-[#111] rounded-xl overflow-hidden relative shadow-lg">
+                      {item.poster_path ? (
+                        <img 
+                          src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} 
+                          alt={item.show_title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Tv className="w-8 h-8 text-[#333]" />
+                        </div>
+                      )}
+                    </div>
+                  </Link>
 
                   {/* Info */}
-                  <div className="flex-1 px-4 py-3 min-w-0">
-                    <h3 className="font-bold text-sm text-brutal-white uppercase tracking-wide truncate group-hover:text-brutal-red transition-colors">
-                      {item.show_title}
-                    </h3>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="brutal-progress flex-1 max-w-[180px]">
-                        <div
-                          className="brutal-progress-fill"
-                          style={{ width: `${Math.min(100, item.progress_percent)}%` }}
-                        ></div>
+                  <div className="flex flex-col flex-1 py-1 min-w-0 justify-between">
+                    <div>
+                      <Link to={`/media/tv/${item.tmdb_id}`} className="block">
+                        <h3 className="font-bold text-xl text-white truncate hover:text-brutal-red transition-colors">
+                          {item.show_title}
+                        </h3>
+                      </Link>
+                      
+                      {item.next_episode_season !== null && item.next_episode_number !== null && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="bg-[#2a2a2a] text-[#ddd] text-xs font-mono px-2 py-1 rounded-md">
+                            S.{item.next_episode_season.toString().padStart(2, '0')} E.{item.next_episode_number.toString().padStart(2, '0')}
+                          </span>
+                          <span className="text-sm text-[#ccc] truncate">
+                            {item.next_episode_title || 'TBA'}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 mt-3">
+                        <span className="text-xs text-[#888] whitespace-nowrap">
+                          {item.watched_episodes}/{item.total_episodes} {episodesLeft > 0 ? `(${episodesLeft} left)` : ''}
+                        </span>
+                        <div className="flex-1 h-1.5 bg-[#333] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-brutal-red rounded-full"
+                            style={{ width: `${Math.min(100, item.progress_percent)}%` }}
+                          ></div>
+                        </div>
                       </div>
-                      <span className="text-[11px] text-brutal-gray font-mono tracking-tight">
-                        {item.watched_episodes}/{item.total_episodes}
-                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-4 mt-4">
+                      <Link to={`/media/tv/${item.tmdb_id}`} className="text-sm text-[#888] hover:text-white transition-colors">
+                        Details
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          markNextWatchedMutation.mutate(item.tv_show_id);
+                        }}
+                        disabled={markNextWatchedMutation.isPending}
+                        className="w-16 h-8 rounded-full border border-white flex items-center justify-center hover:bg-white hover:text-black text-white transition-colors disabled:opacity-50"
+                      >
+                        {markNextWatchedMutation.isPending && markNextWatchedMutation.variables === item.tv_show_id ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent animate-spin rounded-full"></div>
+                        ) : (
+                          <CheckCircle2 className="w-5 h-5" strokeWidth={1.5} />
+                        )}
+                      </button>
                     </div>
                   </div>
-
-                  {/* Action */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      markNextWatchedMutation.mutate(item.tv_show_id);
-                    }}
-                    disabled={markNextWatchedMutation.isPending}
-                    title="Mark next episode as watched"
-                    className="relative z-10 w-20 h-24 flex items-center justify-center border-l-2 border-brutal-border bg-brutal-mid hover:bg-brutal-red text-brutal-gray hover:text-brutal-white transition-all flex-shrink-0 disabled:opacity-50"
-                  >
-                    {markNextWatchedMutation.isPending && markNextWatchedMutation.variables === item.tv_show_id ? (
-                      <div className="w-5 h-5 border-2 border-brutal-white border-t-transparent animate-spin"></div>
-                    ) : (
-                      <CheckCircle2 className="w-5 h-5" />
-                    )}
-                  </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="border-2 border-brutal-border bg-brutal-dark p-12 text-center">

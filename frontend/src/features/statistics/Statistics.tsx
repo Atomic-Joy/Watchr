@@ -1,12 +1,32 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { fetchWithAuth } from '../../lib/api';
-import { Clock, Tv, Film, TrendingUp, BarChart2 } from 'lucide-react';
+import { Clock, Tv, Film, TrendingUp, BarChart2, X } from 'lucide-react';
 
 export function Statistics() {
+  const [activeModal, setActiveModal] = useState<'shows' | 'movies' | null>(null);
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['statistics'],
     queryFn: () => fetchWithAuth('/users/me/stats'),
   });
+
+  const { data: progress } = useQuery({
+    queryKey: ['progress'],
+    queryFn: () => fetchWithAuth('/users/me/progress'),
+    enabled: activeModal === 'shows',
+  });
+
+  const { data: history } = useQuery({
+    queryKey: ['history'],
+    queryFn: () => fetchWithAuth('/users/me/history'),
+    enabled: activeModal === 'movies',
+  });
+
+  const completedShows = progress?.filter((p: any) => p.watched_episodes === p.total_episodes && p.total_episodes > 0) || [];
+  const watchedMovies = history?.filter((h: any) => h.media_type === 'movie') || [];
+
 
   return (
     <div className="space-y-12 animate-slide-up">
@@ -35,22 +55,26 @@ export function Statistics() {
             accent="text-brutal-red"
             border="border-r-2 border-b-2 md:border-b-0 border-brutal-border"
           />
-          <StatBlock
-            icon={<Tv className="w-5 h-5" />}
-            label="Shows Done"
-            value={`${stats?.shows_completed || 0}`}
-            unit=""
-            accent="text-brutal-green"
-            border="border-b-2 md:border-b-0 md:border-r-2 border-brutal-border"
-          />
-          <StatBlock
-            icon={<Film className="w-5 h-5" />}
-            label="Movies"
-            value={`${stats?.movies_watched || 0}`}
-            unit=""
-            accent="text-brutal-yellow"
-            border="border-r-2 border-brutal-border"
-          />
+          <div onClick={() => setActiveModal('shows')} className="cursor-pointer hover:bg-brutal-mid transition-colors group">
+            <StatBlock
+              icon={<Tv className="w-5 h-5 group-hover:scale-110 transition-transform" />}
+              label="Shows Done"
+              value={`${stats?.shows_completed || 0}`}
+              unit=""
+              accent="text-brutal-green"
+              border="border-b-2 md:border-b-0 md:border-r-2 border-brutal-border"
+            />
+          </div>
+          <div onClick={() => setActiveModal('movies')} className="cursor-pointer hover:bg-brutal-mid transition-colors group">
+            <StatBlock
+              icon={<Film className="w-5 h-5 group-hover:scale-110 transition-transform" />}
+              label="Movies"
+              value={`${stats?.movies_watched || 0}`}
+              unit=""
+              accent="text-brutal-yellow"
+              border="border-r-2 border-brutal-border"
+            />
+          </div>
           <StatBlock
             icon={<TrendingUp className="w-5 h-5" />}
             label="Top Genre"
@@ -105,36 +129,56 @@ export function Statistics() {
           </div>
         </div>
       </div>
+
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brutal-black/80">
+          <div className="bg-brutal-dark border-2 border-brutal-border w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="p-4 border-b-2 border-brutal-border flex justify-between items-center">
+              <h3 className="font-bold uppercase tracking-widest text-brutal-white">
+                {activeModal === 'shows' ? 'Completed Shows' : 'Watched Movies'}
+              </h3>
+              <button onClick={() => setActiveModal(null)} className="text-brutal-gray hover:text-brutal-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="divide-y-2 divide-brutal-border">
+              {(activeModal === 'shows' ? completedShows : watchedMovies).map((item: any) => {
+                const tmdbId = activeModal === 'shows' ? item.tmdb_id : item.details?.tmdb_id;
+                const link = activeModal === 'shows' ? `/media/tv/${tmdbId}` : `/media/movie/${tmdbId}`;
+                const title = activeModal === 'shows' ? item.show_title : item.title;
+                const itemId = activeModal === 'shows' ? item.tv_show_id : item.media_id;
+                
+                return (
+                  <Link key={itemId} to={link} className="block p-4 group hover:bg-brutal-mid transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-brutal-white group-hover:text-brutal-red transition-colors">{title}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StatBlock({ 
-  icon, label, value, unit, accent, border 
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
-  value: string; 
-  unit: string; 
-  accent: string; 
-  border: string;
-}) {
+function StatBlock({ icon, label, value, unit, accent, border }: { icon: React.ReactNode, label: string, value: string, unit: string, accent: string, border: string }) {
   return (
-    <div className={`bg-brutal-dark p-6 ${border} group hover:bg-brutal-mid transition-colors`}>
-      <div className={`${accent} mb-4`}>{icon}</div>
-      <div className="flex items-baseline gap-1">
-        <span className="text-3xl md:text-4xl font-bold text-brutal-white font-mono tracking-tight">
-          {value}
-        </span>
-        {unit && (
-          <span className="text-[10px] text-brutal-gray uppercase tracking-wider font-bold">
-            {unit}
-          </span>
-        )}
+    <div className={`p-6 md:p-8 flex flex-col justify-between h-full bg-brutal-dark ${border}`}>
+      <div className={`mb-6 ${accent}`}>
+        {icon}
       </div>
-      <p className="text-[10px] text-brutal-gray uppercase tracking-[0.2em] mt-2 font-bold">
-        {label}
-      </p>
+      <div>
+        <div className="flex items-baseline gap-2 mb-2">
+          <span className="text-4xl md:text-5xl lg:text-6xl font-bold text-brutal-white tracking-tight">
+            {value}
+          </span>
+          {unit && <span className="text-xs text-brutal-gray font-bold tracking-widest">{unit}</span>}
+        </div>
+        <span className="text-[10px] text-brutal-gray uppercase font-bold tracking-[0.2em]">{label}</span>
+      </div>
     </div>
   );
 }

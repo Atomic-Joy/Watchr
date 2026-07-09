@@ -20,18 +20,15 @@ export function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-brutal-black text-brutal-white font-sans">
+    <div className="h-screen flex flex-col bg-brutal-black text-brutal-white font-sans overflow-hidden">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-brutal-black border-b-2 border-brutal-border">
+      <header className="flex-none z-50 bg-brutal-black border-b-2 border-brutal-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <NavLink to="/" className="flex items-center gap-2 group">
               <span className="text-2xl font-bold tracking-tighter text-brutal-red">
                 WATCHR
-              </span>
-              <span className="hidden sm:block text-[10px] text-brutal-gray uppercase tracking-[0.3em] mt-1">
-                track everything
               </span>
             </NavLink>
 
@@ -40,10 +37,10 @@ export function Layout() {
               <NavItem to="/" icon={<Home className="w-4 h-4" />} label="Home" />
               <NavItem to="/search" icon={<Search className="w-4 h-4" />} label="Search" />
               <NavItem to="/stats" icon={<BarChart2 className="w-4 h-4" />} label="Stats" />
-              
+
               <div className="w-px h-8 bg-brutal-border mx-2"></div>
-              
-              <button 
+
+              <button
                 onClick={logout}
                 className="flex items-center gap-2 px-4 py-2 text-brutal-gray hover:text-brutal-red text-xs uppercase tracking-widest font-bold transition-colors"
               >
@@ -56,12 +53,14 @@ export function Layout() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+      <main className="flex-1 overflow-y-auto w-full relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+          <Outlet />
+        </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t-2 border-brutal-border mt-16">
+      <footer className="flex-none border-t-2 border-brutal-border bg-brutal-black z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
           <span className="text-[10px] text-brutal-gray uppercase tracking-[0.3em]">
             © 2026 WATCHR
@@ -81,10 +80,9 @@ function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
       to={to}
       end={to === '/'}
       className={({ isActive }) =>
-        `flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-widest font-bold transition-all border-b-2 ${
-          isActive
-            ? 'text-brutal-white border-brutal-red'
-            : 'text-brutal-gray border-transparent hover:text-brutal-white hover:border-brutal-white'
+        `flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-widest font-bold transition-all border-b-2 ${isActive
+          ? 'text-brutal-white border-brutal-red'
+          : 'text-brutal-gray border-transparent hover:text-brutal-white hover:border-brutal-white'
         }`
       }
     >

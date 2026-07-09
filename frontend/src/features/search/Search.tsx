@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { Search as SearchIcon, Film, Tv, Star, Calendar } from 'lucide-react';
 import { fetchWithAuth } from '../../lib/api';
 
@@ -43,7 +44,7 @@ export function Search() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="SEARCH MOVIES & TV SHOWS..."
+          placeholder="       SEARCH MOVIES & TV SHOWS..."
           className="brutal-input pl-12 text-lg border-2 border-brutal-border focus:border-brutal-red"
         />
         {isLoading && (
@@ -99,54 +100,55 @@ function MediaCard({ item }: { item: any }) {
     : null;
 
   return (
-    <div className="brutal-card group cursor-pointer overflow-hidden">
-      {/* Poster */}
-      <div className="relative aspect-[2/3] bg-brutal-mid overflow-hidden">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            {isMovie ? (
-              <Film className="w-10 h-10 text-brutal-border" />
-            ) : (
-              <Tv className="w-10 h-10 text-brutal-border" />
-            )}
+    <Link to={`/media/${item.media_type}/${item.id}`} className="block">
+      <div className="brutal-card group cursor-pointer overflow-hidden h-full">
+        {/* Poster */}
+        <div className="relative aspect-[2/3] bg-brutal-mid overflow-hidden">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={title}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              {isMovie ? (
+                <Film className="w-10 h-10 text-brutal-border" />
+              ) : (
+                <Tv className="w-10 h-10 text-brutal-border" />
+              )}
+            </div>
+          )}
+          {/* Media Type Badge */}
+          <div className={`absolute top-0 left-0 px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${isMovie ? 'bg-brutal-blue text-brutal-white' : 'bg-brutal-green text-brutal-black'
+            }`}>
+            {isMovie ? 'Film' : 'TV'}
           </div>
-        )}
-        {/* Media Type Badge */}
-        <div className={`absolute top-0 left-0 px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${
-          isMovie ? 'bg-brutal-blue text-brutal-white' : 'bg-brutal-green text-brutal-black'
-        }`}>
-          {isMovie ? 'Film' : 'TV'}
+          {/* Rating */}
+          {item.vote_average > 0 && (
+            <div className="absolute bottom-0 right-0 bg-brutal-black border-t-2 border-l-2 border-brutal-border px-2 py-1 flex items-center gap-1">
+              <Star className="w-3 h-3 text-brutal-yellow fill-brutal-yellow" />
+              <span className="text-[11px] font-mono font-bold text-brutal-yellow">
+                {item.vote_average.toFixed(1)}
+              </span>
+            </div>
+          )}
         </div>
-        {/* Rating */}
-        {item.vote_average > 0 && (
-          <div className="absolute bottom-0 right-0 bg-brutal-black border-t-2 border-l-2 border-brutal-border px-2 py-1 flex items-center gap-1">
-            <Star className="w-3 h-3 text-brutal-yellow fill-brutal-yellow" />
-            <span className="text-[11px] font-mono font-bold text-brutal-yellow">
-              {item.vote_average.toFixed(1)}
+
+        {/* Info */}
+        <div className="p-3 border-t-2 border-brutal-border">
+          <h3 className="text-xs font-bold text-brutal-white uppercase tracking-wide line-clamp-1 group-hover:text-brutal-red transition-colors">
+            {title}
+          </h3>
+          <div className="flex items-center gap-1 mt-1 text-brutal-gray">
+            <Calendar className="w-3 h-3" />
+            <span className="text-[10px] font-mono">
+              {date ? date.substring(0, 4) : '----'}
             </span>
           </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="p-3 border-t-2 border-brutal-border">
-        <h3 className="text-xs font-bold text-brutal-white uppercase tracking-wide line-clamp-1 group-hover:text-brutal-red transition-colors">
-          {title}
-        </h3>
-        <div className="flex items-center gap-1 mt-1 text-brutal-gray">
-          <Calendar className="w-3 h-3" />
-          <span className="text-[10px] font-mono">
-            {date ? date.substring(0, 4) : '----'}
-          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

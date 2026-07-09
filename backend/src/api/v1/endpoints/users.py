@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import uuid
 
 from src.infrastructure.database.session import get_db
@@ -96,20 +96,26 @@ async def update_user_preferences(
 
 class WatchHistoryItem(BaseModel):
     media_type: str
+    media_id: uuid.UUID
     watched_at: str
     title: str
-    details: dict
+    details: Dict[str, Any]
 
     class Config:
         from_attributes = True
 
 class WatchProgressItem(BaseModel):
     tv_show_id: uuid.UUID
+    tmdb_id: int
     show_title: str
     progress_percent: float
     watched_episodes: int
     total_episodes: int
     last_watched_at: str
+    poster_path: Optional[str] = None
+    next_episode_season: Optional[int] = None
+    next_episode_number: Optional[int] = None
+    next_episode_title: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -163,6 +169,7 @@ async def get_my_watch_history(
                 
         history_items.append(WatchHistoryItem(
             media_type=record.media_type,
+            media_id=record.media_id,
             watched_at=record.watched_at.isoformat(),
             title=title,
             details=details
@@ -187,16 +194,204 @@ async def get_my_watch_progress(
     
     progress_items = []
     for progress, tv_show in rows:
+        from src.domain.models.metadata import Episode, Season
+        from src.domain.models.history import WatchHistory
+        
+        next_ep_stmt = (
+            select(Episode, Season)
+            .join(Season, Episode.season_id == Season.id)
+            .outerjoin(
+                WatchHistory,
+                (WatchHistory.media_id == Episode.id) & (WatchHistory.user_id == current_user.id)
+            )
+            .where(
+                Season.tv_show_id == tv_show.id,
+                Season.season_number > 0,
+                WatchHistory.id == None
+            )
+            .order_by(Season.season_number, Episode.episode_number)
+            .limit(1)
+        )
+        next_ep_res = await db.execute(next_ep_stmt)
+        next_ep_row = next_ep_res.first()
+        
+        next_episode_season = None
+        next_episode_number = None
+        next_episode_title = None
+        if next_ep_row:
+            next_episode, next_season = next_ep_row
+            next_episode_season = next_season.season_number
+            next_episode_number = next_episode.episode_number
+            next_episode_title = next_episode.title
+
         progress_items.append(WatchProgressItem(
             tv_show_id=tv_show.id,
+            tmdb_id=tv_show.tmdb_id,
             show_title=tv_show.title,
             progress_percent=float(progress.progress_percent),
             watched_episodes=progress.watched_episodes or 0,
             total_episodes=progress.total_episodes or 0,
-            last_watched_at=progress.last_watched_at.isoformat()
+            last_watched_at=progress.last_watched_at.isoformat(),
+            poster_path=tv_show.poster_path,
+            next_episode_season=next_episode_season,
+            next_episode_number=next_episode_number,
+            next_episode_title=next_episode_title
         ))
         
     return progress_items
+
+@router.post("/me/progress/{tv_show_id}")
+async def track_tv_show(
+    tv_show_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from src.domain.models.history import WatchProgress
+    from src.domain.models.metadata import TVShow
+    
+    show = await db.execute(select(TVShow).where(TVShow.id == tv_show_id))
+    if not show.scalars().first():
+        raise HTTPException(status_code=404, detail="TV Show not found in local DB")
+        
+    stmt = select(WatchProgress).where(
+        WatchProgress.user_id == current_user.id,
+        WatchProgress.tv_show_id == tv_show_id
+    )
+    res = await db.execute(stmt)
+    progress = res.scalars().first()
+    
+    if not progress:
+        import datetime
+        from src.application.services.sync_service import SyncService
+        sync_service = SyncService(db)
+        await sync_service._recalculate_tv_show_progress(current_user.id, tv_show_id, None, datetime.datetime.now(datetime.timezone.utc))
+        await db.commit()
+        
+        # Fallback if _recalculate skipped it due to 0 episodes
+        res2 = await db.execute(stmt)
+        if not res2.scalars().first():
+            from src.domain.models.history import WatchProgress
+            fallback_progress = WatchProgress(
+                user_id=current_user.id,
+                tv_show_id=tv_show_id,
+                total_episodes=0,
+                watched_episodes=0,
+                progress_percent=0.0
+            )
+            db.add(fallback_progress)
+            await db.commit()
+        
+    return {"status": "success", "message": "TV show is now being tracked."}
+
+@router.delete("/me/progress/{tv_show_id}")
+async def untrack_tv_show(
+    tv_show_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from src.domain.models.history import WatchProgress
+    stmt = select(WatchProgress).where(
+        WatchProgress.user_id == current_user.id,
+        WatchProgress.tv_show_id == tv_show_id
+    )
+    res = await db.execute(stmt)
+    progress = res.scalars().first()
+    if progress:
+        await db.delete(progress)
+        await db.commit()
+    return {"status": "success", "message": "TV show is no longer tracked."}
+
+@router.post("/me/history/movie/{movie_id}")
+async def mark_movie_watched(
+    movie_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from src.domain.models.history import WatchHistory
+    from src.domain.models.metadata import Movie
+    
+    movie = await db.execute(select(Movie).where(Movie.id == movie_id))
+    if not movie.scalars().first():
+        raise HTTPException(status_code=404, detail="Movie not found in local DB")
+        
+    history = WatchHistory(
+        user_id=current_user.id,
+        media_type='movie',
+        media_id=movie_id
+    )
+    db.add(history)
+    await db.commit()
+    return {"status": "success", "message": "Movie marked as watched."}
+
+@router.post("/me/history/episode/{episode_id}")
+async def mark_episode_watched(
+    episode_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from src.domain.models.history import WatchHistory
+    from src.domain.models.metadata import Episode, Season
+    
+    ep_stmt = select(Episode, Season).join(Season, Episode.season_id == Season.id).where(Episode.id == episode_id)
+    res = await db.execute(ep_stmt)
+    row = res.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Episode not found in local DB")
+        
+    episode, season = row
+    
+    history = WatchHistory(
+        user_id=current_user.id,
+        media_type='episode',
+        media_id=episode_id
+    )
+    db.add(history)
+    await db.commit()
+    
+    import datetime
+    from src.application.services.sync_service import SyncService
+    sync_service = SyncService(db)
+    await sync_service._recalculate_tv_show_progress(current_user.id, season.tv_show_id, episode_id, datetime.datetime.now(datetime.timezone.utc))
+    await db.commit()
+    
+    return {"status": "success", "message": "Episode marked as watched."}
+
+@router.delete("/me/history/episode/{episode_id}")
+async def unmark_episode_watched(
+    episode_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from src.domain.models.history import WatchHistory
+    from src.domain.models.metadata import Episode, Season
+    
+    ep_stmt = select(Episode, Season).join(Season, Episode.season_id == Season.id).where(Episode.id == episode_id)
+    res = await db.execute(ep_stmt)
+    row = res.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Episode not found in local DB")
+        
+    episode, season = row
+    
+    hist_stmt = select(WatchHistory).where(
+        WatchHistory.user_id == current_user.id,
+        WatchHistory.media_type == 'episode',
+        WatchHistory.media_id == episode_id
+    )
+    hist_res = await db.execute(hist_stmt)
+    histories = hist_res.scalars().all()
+    for h in histories:
+        await db.delete(h)
+    
+    await db.commit()
+    
+    import datetime
+    from src.application.services.sync_service import SyncService
+    sync_service = SyncService(db)
+    await sync_service._recalculate_tv_show_progress(current_user.id, season.tv_show_id, None, datetime.datetime.now(datetime.timezone.utc))
+    await db.commit()
+    
+    return {"status": "success", "message": "Episode unmarked as watched."}
 
 @router.post("/me/progress/{tv_show_id}/watch-next")
 async def mark_next_episode_watched(
