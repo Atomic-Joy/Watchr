@@ -34,7 +34,7 @@ export function Statistics() {
       <div>
         <h1 className="font-serif italic text-4xl md:text-5xl text-brutal-white mb-2">Statistics</h1>
         <p className="text-brutal-gray text-xs uppercase tracking-[0.3em]">
-          A look back at the time you've spent watching
+          A look back at the time
         </p>
       </div>
 
@@ -147,7 +147,7 @@ export function Statistics() {
                 const link = activeModal === 'shows' ? `/media/tv/${tmdbId}` : `/media/movie/${tmdbId}`;
                 const title = activeModal === 'shows' ? item.show_title : item.title;
                 const itemId = activeModal === 'shows' ? item.tv_show_id : item.media_id;
-                
+
                 return (
                   <Link key={itemId} to={link} className="block p-4 group hover:bg-brutal-mid transition-colors">
                     <div className="flex items-center justify-between">

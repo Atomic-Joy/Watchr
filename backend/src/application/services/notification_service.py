@@ -14,13 +14,15 @@ logger = logging.getLogger(__name__)
 
 class NotificationService:
     @staticmethod
-    async def get_user_notifications(db: AsyncSession, user_id: UUID, limit: int = 50) -> List[ReleaseNotification]:
+    async def get_user_notifications(db: AsyncSession, user_id: UUID, limit: int = 50) -> List[tuple]:
         """
         Dynamically pull release notifications for shows the user is currently watching.
         It joins ReleaseNotification with the user's WatchProgress based on media_id matching tv_show_id.
         """
+        from sqlalchemy import asc
+        
         stmt = (
-            select(ReleaseNotification)
+            select(ReleaseNotification, TVShow)
             .join(
                 WatchProgress,
                 and_(
@@ -29,12 +31,13 @@ class NotificationService:
                     ReleaseNotification.media_type == 'episode'
                 )
             )
-            .order_by(desc(ReleaseNotification.release_date))
+            .join(TVShow, TVShow.id == ReleaseNotification.media_id)
+            .order_by(asc(ReleaseNotification.release_date))
             .limit(limit)
         )
         
         result = await db.execute(stmt)
-        return list(result.scalars().all())
+        return result.all()
     
     @staticmethod
     async def mark_as_read(db: AsyncSession, user_id: UUID, notification_id: UUID) -> UserNotification:
