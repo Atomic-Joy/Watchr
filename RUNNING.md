@@ -1,135 +1,112 @@
-# Running the Watchr (Trakt Clone) Application
-
-Follow this guide to get the local development environment up and running.
+<div align="center">
+  <h1>⚙️ Watchr Development Guide</h1>
+  <p><strong>Comprehensive Setup, Execution, and API Testing Manual</strong></p>
+  
+  <p>
+    <a href="#-prerequisites">Prerequisites</a> •
+    <a href="#%EF%B8%8F-local-environment-setup">Environment Setup</a> •
+    <a href="#-running-the-application">Running the Application</a> •
+    <a href="#%EF%B8%8F-api-testing-guide">API Testing Guide</a> •
+    <a href="#-database-management">Database Management</a>
+  </p>
+</div>
 
 ---
+
+This guide provides step-by-step instructions for initializing the local development environment, running background services, and thoroughly testing the Watchr backend API.
 
 ## 📋 Prerequisites
 
-Make sure you have the following installed on your host system:
-* **Docker** or **Podman** (with `docker compose` compatibility or `podman-compose`)
+Before you begin, ensure you have the following installed on your host system:
+* **Docker** or **Podman** (with `docker compose` compatibility)
 * **Python 3.10+**
-* **Node.js** & **npm**
+* **Node.js 20+** & **npm**
+* **cURL** or a similar HTTP client for testing
 
 ---
 
-## 🛠️ Step 1: Start Database & Redis (Infrastructure)
+## 🛠️ Local Environment Setup
 
-Start the local PostgreSQL database and Redis instance using Docker Compose:
+### 1. Start Infrastructure (PostgreSQL & Redis)
+The backend relies on PostgreSQL for persistent storage and Redis for Celery task queuing and caching.
 ```bash
 docker compose up -d
 ```
-> **Note for Podman users:** The `docker-compose.yml` has been updated to use fully qualified image names (`docker.io/library/...`) to prevent interactive registry prompts.
+> **Note for Podman users:** The `docker-compose.yml` uses fully qualified image names (`docker.io/library/...`) to prevent interactive registry prompts.
 
----
+### 2. Configure Backend Environment
+Navigate to the `backend/` directory, set up the virtual environment, and define the required secrets:
 
-## 🐍 Step 2: Set Up and Start the Backend
-
-1. **Activate the Virtual Environment:**
-   Navigate to the `backend/` directory and activate the pre-existing virtual environment:
-   ```bash
-   cd backend
-   source venv/bin/activate
-   ```
-   *(If the virtual environment is missing or empty, run `pip install -r requirements.txt`)*
-
-2. **Configure Environment Variables:**
-   Create a `.env` file inside the `backend/` directory:
-   ```env
-   TMDB_API_KEY=your_tmdb_api_key_here
-   ```
-   > **TMDB API Keys:** This project seamlessly supports both **v3 API keys** (32 hex characters, passed as query parameters) and **v4 Read Access Tokens** (JWTs, sent in the Bearer header).
-
-3. **Generate and Run Database Migrations:**
-   ```bash
-   alembic revision --autogenerate -m "Initial schema"
-   alembic upgrade head
-   ```
-
-4. **Start the FastAPI Application:**
-   ```bash
-   uvicorn src.main:app --reload
-   ```
-   The API will be available at [http://localhost:8000](http://localhost:8000). You can access the interactive OpenAPI/Swagger documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
-
-5. **Start the Celery Background Worker & Beat Scheduler (Separate Terminals):**
-   In a new terminal window, activate the virtual environment and start the worker to handle background metadata sync tasks:
-   ```bash
-   cd backend
-   source venv/bin/activate
-   celery -A src.workers.celery_app worker --loglevel=info
-   ```
-   In another terminal, start the celery beat scheduler for running the daily release notification checks:
-   ```bash
-   cd backend
-   source venv/bin/activate
-   celery -A src.workers.celery_app beat --loglevel=info
-   ```
-
----
-
-## 💻 Step 3: Set Up and Start the Frontend
-
-1. **Navigate to the Root Directory:**
-   ```bash
-   cd /home/atomicjoy/Projects/trakt
-   ```
-
-2. **Install Frontend Dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Start the Development Server:**
-   ```bash
-   npm run dev
-   ```
-   The frontend hot-reloading dev server will start (usually at [http://localhost:5173](http://localhost:5173)).
-
----
-
-## 🧪 Running & Testing the API
-
-### 1. Start Services
-Make sure your PostgreSQL database and Redis instances are running:
-```bash
-docker compose up -d
-```
-
-### 2. Run Database Migrations
-Apply the database schemas (including user preferences, watch history, sync logs, and metadata tables):
 ```bash
 cd backend
+python -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Create a `.env` file inside the `backend/` directory:
+```env
+TMDB_API_KEY=your_tmdb_api_key_here
+```
+> **💡 TMDB API Keys:** This project seamlessly supports both **v3 API keys** (32 hex characters, passed as query parameters) and **v4 Read Access Tokens** (JWTs, sent in the Bearer header).
+
+### 3. Initialize Database Schema
+Run Alembic migrations to construct the database schema (including users, watch history, sync logs, and metadata tables):
+```bash
 alembic upgrade head
 ```
 
-### 3. Start the FastAPI Dev Server
+### 4. Setup Frontend Dependencies
+In a new terminal window, navigate to the frontend directory and install NPM packages:
 ```bash
+cd frontend
+npm install
+```
+
+---
+
+## 🚀 Running the Application
+
+To fully test the system, you must run four separate processes concurrently. Open four terminal windows/tabs:
+
+### Terminal 1: FastAPI Server
+Runs the core REST API handling client requests.
+```bash
+cd backend && source venv/bin/activate
 uvicorn src.main:app --reload
 ```
-The server will start at [http://localhost:8000](http://localhost:8000) and the interactive docs will be at [http://localhost:8000/docs](http://localhost:8000/docs).
+* **API URL:** [http://localhost:8000](http://localhost:8000)
+* **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### 4. Start the Celery Worker & Beat (In separate terminals)
-To handle background metadata synchronization:
+### Terminal 2: Celery Worker
+Processes asynchronous tasks like metadata syncs and background cache updates.
 ```bash
-cd backend
-source venv/bin/activate
+cd backend && source venv/bin/activate
 celery -A src.workers.celery_app worker --loglevel=info
 ```
-To run scheduled notification checks:
+
+### Terminal 3: Celery Beat (Scheduler)
+Triggers periodic tasks, such as generating daily release notifications.
 ```bash
-cd backend
-source venv/bin/activate
+cd backend && source venv/bin/activate
 celery -A src.workers.celery_app beat --loglevel=info
 ```
+
+### Terminal 4: Frontend Development Server
+Runs the React 19 UI with hot module replacement (HMR).
+```bash
+cd frontend
+npm run dev
+```
+* **Frontend UI:** [http://localhost:5173](http://localhost:5173)
 
 ---
 
 ## 🛰️ API Testing Guide
 
-### A. Authentication & Users
-All commands can be run from the root of the workspace.
+All `curl` commands below assume you are running them from your root directory and the backend is active on port 8000.
+
+### A. Authentication & User Management
 
 #### 1. Register a new user:
 ```bash
@@ -138,26 +115,26 @@ curl -X POST "http://localhost:8000/api/v1/users/" \
      -d '{"email": "test@example.com", "password": "securepassword123"}'
 ```
 
-#### 2. Log in and get an Access Token:
+#### 2. Log in and acquire an Access Token:
 ```bash
 curl -X POST "http://localhost:8000/api/v1/auth/login/access-token" \
      -H "Content-Type: application/x-www-form-urlencoded" \
      -d "username=test@example.com&password=securepassword123"
 ```
-*Note: Access tokens are valid for 30 minutes. Export the token value as an environment variable to use in the subsequent steps:*
+> **Important:** Access tokens are valid for 30 minutes. Export the token value as an environment variable to use in subsequent requests:
 ```bash
 export TOKEN="<your_copied_access_token_here>"
 ```
 
-#### 3. View user profile:
+#### 3. View User Profile:
 ```bash
 curl -X GET "http://localhost:8000/api/v1/users/me" \
      -H "Authorization: Bearer $TOKEN"
 ```
 
-#### 4. View and update preferences:
+#### 4. Manage Preferences:
 ```bash
-# Get preferences
+# Retrieve current preferences
 curl -X GET "http://localhost:8000/api/v1/users/me/preferences" \
      -H "Authorization: Bearer $TOKEN"
 
@@ -170,40 +147,28 @@ curl -X PATCH "http://localhost:8000/api/v1/users/me/preferences" \
 
 ---
 
-### B. Metadata & Search
-Test the local-first search system (which integrates Redis caching).
+### B. Metadata & Local-First Search
+Test the resilient search system, which utilizes Redis for caching and Celery for background ingestion.
 
-#### 1. Trigger search (cache miss -> hits TMDB -> enqueues background TV show/movie sync):
+#### 1. Trigger Initial Search (Cache Miss)
+This will hit TMDB and enqueue a background worker task to sync the metadata locally.
 ```bash
 curl -X GET "http://localhost:8000/api/v1/metadata/search?query=Inception"
 ```
-**Expected Response:**
-```json
-{
-  "results": [ ... ],
-  "source": "tmdb"
-}
-```
-*(Check your Celery logs to see the worker syncing details for movies and show seasons on the fly!)*
+*(Check your Celery Worker terminal to observe the background sync occurring!)*
 
-#### 2. Run the search again (cache hit -> returns directly from local database/Redis cache):
+#### 2. Repeat Search (Cache Hit)
+This returns results immediately from the local database or Redis cache.
 ```bash
 curl -X GET "http://localhost:8000/api/v1/metadata/search?query=Inception"
-```
-**Expected Response:**
-```json
-{
-  "results": [ ... ],
-  "source": "local"
-}
 ```
 
 ---
 
 ### C. Conflict-Free Watch Progress Sync
 
-#### 1. Push watch logs:
-Pushes a batch of watch progress logs (simulating offline scrobble logs collected by a client):
+#### 1. Push Offline Watch Logs
+Simulates an offline client pushing queued scrobble events.
 ```bash
 curl -X POST "http://localhost:8000/api/v1/sync/push" \
      -H "Authorization: Bearer $TOKEN" \
@@ -227,81 +192,38 @@ curl -X POST "http://localhost:8000/api/v1/sync/push" \
        }
      ]'
 ```
-**Expected Response:**
-```json
-{
-  "processed": 2,
-  "skipped": 0,
-  "status": "success"
-}
-```
 
-#### 2. Inspect watch history:
+#### 2. Retrieve Chronological Watch History
 ```bash
 curl -X GET "http://localhost:8000/api/v1/users/me/history" \
      -H "Authorization: Bearer $TOKEN"
 ```
-**Expected Response:**
-```json
-[
-  {
-    "media_type": "episode",
-    "watched_at": "2026-07-06T11:00:00+00:00",
-    "title": "Game of Thrones - S01E01: Winter Is Coming",
-    "details": {
-      "show_title": "Game of Thrones",
-      "season_number": 1,
-      "episode_number": 1,
-      "episode_title": "Winter Is Coming"
-    }
-  },
-  {
-    "media_type": "movie",
-    "watched_at": "2026-07-06T10:00:00+00:00",
-    "title": "Inception",
-    "details": {
-      "tmdb_id": 27205,
-      "overview": "..."
-    }
-  }
-]
-```
 
-#### 3. Inspect TV Show progress:
+#### 3. Inspect TV Show Completion Progress
 ```bash
 curl -X GET "http://localhost:8000/api/v1/users/me/progress" \
      -H "Authorization: Bearer $TOKEN"
-```
-**Expected Response:**
-```json
-[
-  {
-    "show_title": "Game of Thrones",
-    "progress_percent": 0.27,
-    "last_watched_at": "2026-07-06T11:00:00+00:00"
-  }
-]
 ```
 
 ---
 
 ### D. Pull-Based Release Notifications
 
-#### 1. Retrieve user notification feed:
-Fetches personalized release notifications for TV shows in the user's watch history:
+#### 1. Retrieve Notification Feed
+Fetches on-demand release notifications for tracked TV shows.
 ```bash
 curl -X GET "http://localhost:8000/api/v1/notifications/" \
      -H "Authorization: Bearer $TOKEN"
 ```
 
-#### 2. Mark a notification as read:
+#### 2. Mark Notification as Read
 ```bash
 curl -X POST "http://localhost:8000/api/v1/notifications/<notification_id>/read" \
      -H "Authorization: Bearer $TOKEN"
 ```
 
-#### 3. Manually Trigger Notification Generation:
-To immediately trigger notification generation for tracked TV shows without waiting for the scheduled Celery Beat task, execute the following from the `backend/` directory:
+#### 3. Trigger Notification Engine Manually
+To test notifications without waiting for the scheduled Celery Beat chron job:
 ```bash
 cd backend
 venv/bin/python -c "
@@ -319,25 +241,26 @@ asyncio.run(main())
 
 ---
 
-### E. Direct Database Access & Querying
+## 🗄️ Database Management
 
-To view or manage the data stored in the local PostgreSQL database, use one of the options below:
+Directly interact with the PostgreSQL database for debugging and verification.
 
-#### 1. Connect via CLI (`psql` in Docker / Podman)
-Run the following from the root directory containing your `docker-compose.yml` to start an interactive SQL shell:
+### Option 1: Docker CLI Shell (`psql`)
+Start an interactive SQL session directly inside the container:
 ```bash
 docker compose exec db psql -U postgres -d trakt_clone
 ```
-Useful commands once connected:
-* `\dt` - List all tables.
-* `SELECT * FROM watch_history;` - View logged user watch logs.
-* `SELECT title, first_air_date FROM tv_shows;` - View cached TV show metadata.
-* `\q` - Quit the terminal.
+**Useful `psql` Commands:**
+* `\dt` - List all tables
+* `SELECT * FROM users;` - View registered users
+* `SELECT * FROM watch_history;` - View chronological sync logs
+* `SELECT title, first_air_date FROM tv_shows;` - View cached TV shows
+* `\q` - Quit
 
-#### 2. Connect via Database GUI Client (e.g., DBeaver, pgAdmin)
-Create a new **PostgreSQL** connection with the following settings:
+### Option 2: GUI Database Client (DBeaver, pgAdmin, DataGrip)
+Create a new **PostgreSQL** connection:
 * **Host / Server:** `localhost` (or `127.0.0.1`)
 * **Port:** `5432`
-* **Database:** `trakt_clone` (Make sure to specify this instead of default `postgres`)
+* **Database:** `trakt_clone` *(Important: Not the default `postgres` DB)*
 * **Username:** `postgres`
 * **Password:** `postgres`
