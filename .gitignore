@@ -67,7 +67,3 @@ coverage/
 .nyc_output/
 *.code-workspace
 
-# Temporary local assets
-frontend/public/season-1.jpg
-
-
