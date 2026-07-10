@@ -124,7 +124,7 @@ class UserStatisticsResponse(BaseModel):
     total_hours: int
     shows_completed: int
     movies_watched: int
-    favorite_genre: str
+    episodes_watched: int
 
 @router.get("/me/history", response_model=List[WatchHistoryItem])
 async def get_my_watch_history(
@@ -148,7 +148,12 @@ async def get_my_watch_history(
             movie = m_res.scalars().first()
             if movie:
                 title = movie.title
-                details = {"tmdb_id": movie.tmdb_id, "overview": movie.overview}
+                details = {
+                    "tmdb_id": movie.tmdb_id, 
+                    "overview": movie.overview,
+                    "poster_path": movie.poster_path,
+                    "backdrop_path": movie.backdrop_path
+                }
         elif record.media_type == "episode":
             e_res = await db.execute(
                 select(Episode, Season, TVShow)
@@ -164,7 +169,9 @@ async def get_my_watch_history(
                     "show_title": tv_show.title,
                     "season_number": season.season_number,
                     "episode_number": episode.episode_number,
-                    "episode_title": episode.title
+                    "episode_title": episode.title,
+                    "poster_path": season.poster_path or tv_show.poster_path,
+                    "backdrop_path": tv_show.backdrop_path
                 }
                 
         history_items.append(WatchHistoryItem(
@@ -516,9 +523,17 @@ async def get_my_watch_stats(
     movies_res = await db.execute(movies_stmt)
     movies_watched = movies_res.scalar() or 0
 
+    # Calculate episodes watched
+    episodes_stmt = select(func.count(WatchHistory.id)).where(
+        WatchHistory.user_id == current_user.id,
+        WatchHistory.media_type == "episode"
+    )
+    episodes_res = await db.execute(episodes_stmt)
+    episodes_watched = episodes_res.scalar() or 0
+
     return UserStatisticsResponse(
         total_hours=total_hours,
         shows_completed=shows_completed,
         movies_watched=movies_watched,
-        favorite_genre="N/A"
+        episodes_watched=episodes_watched
     )

@@ -183,10 +183,16 @@ export function MediaDetail() {
                   <span>{(data.release_date || data.first_air_date).substring(0, 4)}</span>
                 </div>
               )}
-              {data.runtime && (
+              {data.runtime > 0 && (
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   <span>{data.runtime} MIN</span>
+                </div>
+              )}
+              {!isMovie && validSeasons.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Tv className="w-4 h-4" />
+                  <span>{validSeasons.length} Season{validSeasons.length !== 1 ? 's' : ''} • {validSeasons.reduce((acc: number, s: any) => acc + (s.episode_count || s.episodes?.length || 0), 0)} Episodes</span>
                 </div>
               )}
             </div>

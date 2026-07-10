@@ -2,7 +2,25 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { fetchWithAuth } from '../../lib/api';
-import { Clock, Tv, Film, TrendingUp, BarChart2, X } from 'lucide-react';
+import { Clock, Tv, Film, TrendingUp, X, ChevronRight, MoreVertical, Star } from 'lucide-react';
+
+function formatHistoryDate(dateStr: string) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  // Reset time part to compare just dates
+  const dateDays = Math.floor((date.getTime() - date.getTimezoneOffset() * 60000) / 86400000);
+  const nowDays = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
+  const diffDays = nowDays - dateDays;
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays > 1 && diffDays < 7) {
+    return 'Last ' + date.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export function Statistics() {
   const [activeModal, setActiveModal] = useState<'shows' | 'movies' | null>(null);
@@ -18,10 +36,9 @@ export function Statistics() {
     enabled: activeModal === 'shows',
   });
 
-  const { data: history } = useQuery({
+  const { data: history, isLoading: historyLoading } = useQuery({
     queryKey: ['history'],
     queryFn: () => fetchWithAuth('/users/me/history'),
-    enabled: activeModal === 'movies',
   });
 
   const completedShows = progress?.filter((p: any) => p.watched_episodes === p.total_episodes && p.total_episodes > 0) || [];
@@ -77,8 +94,8 @@ export function Statistics() {
           </div>
           <StatBlock
             icon={<TrendingUp className="w-5 h-5" />}
-            label="Top Genre"
-            value={stats?.favorite_genre || 'N/A'}
+            label="Episodes"
+            value={`${stats?.episodes_watched || 0}`}
             unit=""
             accent="text-brutal-blue"
             border=""
@@ -86,48 +103,77 @@ export function Statistics() {
         </div>
       )}
 
-      {/* Watch Activity Chart */}
-      <div className="border-2 border-brutal-border bg-brutal-dark">
-        <div className="px-6 py-4 border-b-2 border-brutal-border flex items-center gap-3">
-          <BarChart2 className="w-4 h-4 text-brutal-red" />
-          <h2 className="text-xs uppercase tracking-[0.3em] font-bold text-brutal-white">
-            Watch Activity
-          </h2>
-          <div className="flex-1 h-px bg-brutal-border"></div>
-          <span className="text-[10px] text-brutal-gray uppercase tracking-wider">This Week</span>
+      {/* History Carousel */}
+      <div className="space-y-4 pt-4">
+        <div className="flex items-center gap-1 text-brutal-white font-medium cursor-pointer w-fit hover:text-brutal-gray transition-colors">
+          <h2 className="text-lg">History</h2>
+          <ChevronRight className="w-5 h-5" />
         </div>
-
-        <div className="p-6">
-          <div className="h-48 flex items-end gap-2">
-            {[40, 70, 30, 85, 50, 90, 60].map((height, i) => (
-              <div key={i} className="flex-1 flex flex-col justify-end items-center group">
-                <div
-                  className="w-full bg-brutal-red group-hover:bg-brutal-white transition-colors cursor-pointer relative"
-                  style={{ height: `${height}%` }}
-                >
-                  {/* Tooltip on hover */}
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-brutal-white text-brutal-black px-2 py-1 text-[10px] font-mono font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {Math.round(height * 0.3)}m
+        
+        {historyLoading ? (
+          <div className="flex gap-4 overflow-hidden">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="w-[280px] shrink-0 h-[158px] bg-brutal-dark animate-brutal-pulse rounded-xl"></div>
+            ))}
+          </div>
+        ) : history && history.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scrollbar">
+            {history.slice(0, 10).map((item: any) => {
+              const isMovie = item.media_type === 'movie';
+              const title = isMovie ? item.title : item.details?.show_title || item.title;
+              const subtitle = isMovie 
+                ? 'Movie' 
+                : `S${item.details?.season_number || 0} • E${item.details?.episode_number || 0} - ${item.title}`;
+                
+              const imagePath = item.details?.backdrop_path || item.details?.poster_path;
+              const imageUrl = imagePath ? `https://image.tmdb.org/t/p/w780${imagePath}` : null;
+              
+              return (
+                <div key={item.id} className="w-[280px] shrink-0 snap-start group cursor-pointer">
+                  {/* Image container */}
+                  <div className="w-full aspect-[16/9] bg-[#111] rounded-xl overflow-hidden relative mb-3 shadow-lg">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        {isMovie ? <Film className="w-8 h-8 text-[#333]" /> : <Tv className="w-8 h-8 text-[#333]" />}
+                      </div>
+                    )}
+                    
+                    {/* Timestamp badge */}
+                    <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-white font-medium">
+                      {formatHistoryDate(item.watched_at)}
+                    </div>
+                    
+                    {/* Kebab menu */}
+                    <button className="absolute top-2 right-2 text-white/80 hover:text-white p-1 bg-black/20 hover:bg-black/40 rounded-full transition-colors opacity-0 group-hover:opacity-100">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {/* Info below image */}
+                  <div className="flex items-start justify-between gap-2 px-1">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-brutal-white truncate">
+                        {title}
+                      </h3>
+                      <p className="text-[11px] text-brutal-gray truncate mt-0.5">
+                        {subtitle}
+                      </p>
+                    </div>
+                    <button className="text-brutal-gray hover:text-brutal-white transition-colors shrink-0 mt-0.5">
+                      <Star className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <span className="text-[10px] text-brutal-gray mt-3 font-mono uppercase">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
-
-          {/* Grid lines */}
-          <div className="relative -mt-48 h-48 pointer-events-none">
-            {[0, 25, 50, 75, 100].map(pct => (
-              <div
-                key={pct}
-                className="absolute w-full border-t border-brutal-border/30"
-                style={{ bottom: `${pct}%` }}
-              ></div>
-            ))}
+        ) : (
+          <div className="p-8 text-center border-2 border-brutal-border border-dashed rounded-xl">
+            <p className="text-brutal-gray text-sm uppercase tracking-wider">No history found</p>
           </div>
-        </div>
+        )}
       </div>
 
       {activeModal && (

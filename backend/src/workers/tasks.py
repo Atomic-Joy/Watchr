@@ -27,6 +27,17 @@ async def _sync_metadata_async(media_type: str, tmdb_id: int) -> Dict[str, Any]:
         elif media_type == "tv":
             logger.info(f"Fetching TV show metadata from TMDB for ID: {tmdb_id}")
             data = await client.get_tv_show(tmdb_id)
+            
+            # Fetch episodes for each season
+            for season in data.get("seasons", []):
+                season_num = season.get("season_number")
+                if season_num is not None:
+                    try:
+                        season_details = await client.get_tv_season(tmdb_id, season_num)
+                        season["episodes"] = season_details.get("episodes", [])
+                    except Exception as e:
+                        logger.error(f"Failed to fetch season {season_num} for TV show {tmdb_id}: {e}")
+                        
             await service.upsert_tv_show(data)
             logger.info(f"Successfully synced TV show {data.get('name')} (ID: {tmdb_id})")
             return {"status": "success", "title": data.get("name")}
