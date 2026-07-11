@@ -102,6 +102,14 @@ npm run dev
 
 ---
 
+## 🎨 Testing the New Frontend UI
+
+With the frontend running, you can explore the new features:
+1. **Dashboard (`/`)**: View your personalized **Continue Watching** queue with progress tracking, and check the **Release Radar** tab for upcoming episodes of tracked shows.
+2. **Statistics (`/statistics`)**: Explore your watch stats through new rich analytics cards, and navigate recent watches with the horizontally scrolling **History Carousel**.
+3. **History (`/history`)**: Browse your complete, chronological watch history in the new **Timeline** view, complete with sticky date headers and interactive jumping via the calendar strip.
+
+---
 ## 🛰️ API Testing Guide
 
 All `curl` commands below assume you are running them from your root directory and the backend is active on port 8000.

@@ -22,8 +22,7 @@
 * 💾 **Local-First Resilient Metadata**: Implements a sophisticated mirroring and caching system for TV Show, Season, Episode, and Movie data to support blazing fast query times and fallback offline capabilities.
 * 🔄 **Conflict-Free Watch Progress Sync**: Features a chronological scrobble/push reconciliation engine that resolves out-of-order watch progress logs from multiple clients without data loss.
 * 🔔 **Smart Notification Engine**: Dynamic, pull-based release notification resolver that avoids expensive `O(N * M)` bulk database writes at release time, fetching updates on-demand.
-* 🎨 **Modern Interactive Frontend**: A sleek, responsive UI built with React 19, Vite, TypeScript, Tailwind CSS, and TanStack Query for seamless optimistic state caching.
-
+* 🎨 **Modern Interactive Frontend**: A sleek, responsive UI built with React 19, Vite, TypeScript, Tailwind CSS, and TanStack Query for seamless optimistic state caching. Features a rich dashboard with **Release Radar**, dynamic **Continue Watching** progress tracking, rich analytics cards, and a chronological **History Timeline**.
 ---
 
 ## 🛠️ Technology Stack
