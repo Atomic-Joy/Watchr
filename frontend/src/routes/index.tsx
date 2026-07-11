@@ -5,6 +5,7 @@ import { Dashboard } from '../features/dashboard/Dashboard';
 import { Search } from '../features/search/Search';
 import { Statistics } from '../features/statistics/Statistics';
 import { MediaDetail } from '../features/media/MediaDetail';
+import { HistoryPage } from '../features/history/HistoryPage';
 
 export const router = createBrowserRouter([
   {
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
       {
         path: 'stats',
         element: <Statistics />,
+      },
+      {
+        path: 'history',
+        element: <HistoryPage />,
       },
       {
         path: 'media/:type/:id',
